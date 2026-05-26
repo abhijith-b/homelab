@@ -157,6 +157,62 @@ systemctl --user start filebrowser
 
 > **Note:** `UserNS=keep-id` is required in the Quadlet file. Without it, the container process runs as a remapped UID (~525287) that cannot read the home directory.
 
+## Tailscale features
+
+### Subnet router
+
+Advertises your home LAN to the tailnet so you can reach any device on it (router admin, NAS, printer, etc.) without installing Tailscale on each one.
+
+**Setup:**
+
+```bash
+# Enable IP forwarding
+echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
+
+# Allow masquerading (required for firewalld)
+sudo firewall-cmd --permanent --add-masquerade
+sudo firewall-cmd --reload
+
+# Advertise your home LAN subnet (check yours with: ip route)
+sudo tailscale set --advertise-routes=192.168.1.0/24
+```
+
+Then approve the route in the Tailscale admin console: Machines → your laptop → three-dot menu → **Edit route settings** → enable the subnet.
+
+**On Linux client devices** (Android/iOS/macOS/Windows pick it up automatically):
+```bash
+sudo tailscale set --accept-routes
+```
+
+### Exit node
+
+Routes all internet traffic from your other devices through the laptop. Useful on untrusted networks (coffee shops, hotels) or when you need your home IP abroad.
+
+**Setup:**
+
+```bash
+sudo tailscale set --advertise-exit-node
+```
+
+Then approve in the admin console: Machines → your laptop → three-dot menu → **Edit route settings** → enable **Use as exit node**.
+
+Also disable key expiry on the laptop (same three-dot menu) — prevents the exit node from silently going unreachable when the key expires.
+
+**Using the exit node from another device:**
+
+- **Android/iOS:** Tailscale app → Exit Node → select the laptop
+- **Linux:**
+  ```bash
+  sudo tailscale set --exit-node=<laptop-tailscale-ip>
+  # To stop:
+  sudo tailscale set --exit-node=
+  ```
+
+Verify it's working by checking your public IP — it should show your home IP.
+
+> **Note:** Exit node only works when the laptop is on. Tailscale fails open — if the exit node is unreachable, client devices fall back to direct internet rather than dropping traffic.
+
 ## Day-to-day operations
 
 **Reload Caddy after editing the Caddyfile:**

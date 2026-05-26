@@ -1,0 +1,22 @@
+[Unit]
+Description=Filebrowser - Web file manager
+After=network-online.target
+
+[Container]
+Image=docker.io/filebrowser/filebrowser:v2.63.5
+ContainerName=filebrowser
+Network=homelab.network
+
+Exec=--config /config/settings.json
+SecurityLabelDisable=true
+UserNS=keep-id
+
+Volume=%h/git/homelab/services/filebrowser/config:/config
+Volume=%h/.local/share/containers/homelab/filebrowser/db:/database
+Volume=%h:/srv
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

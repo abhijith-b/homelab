@@ -29,8 +29,13 @@ Compose is the more common choice and has better documentation online, but it is
 | Cockpit | `https://cockpit.abhijithb.org:9090` | System dashboard — CPU, memory, storage, running services. Accessed directly on port 9090, not proxied through Caddy. |
 | Caddy | internal | Reverse proxy for all containerised services. Handles TLS automatically. |
 | Syncthing | `https://sync.abhijithb.org` | Continuous file sync between devices |
+| Filebrowser | `https://files.abhijithb.org` | Web file manager for browsing and managing files on the laptop |
 
 ## Setting up from scratch
+
+### 0. Clone the repo
+
+Clone this repo wherever you like. All Quadlet volume mounts assume `~/git/homelab` — if you use a different path, update the `Volume=` lines in the `.container` files accordingly.
 
 ### 1. Tailscale
 
@@ -119,16 +124,6 @@ systemctl --user start caddy
 
 > **Note:** The Caddyfile volume is mounted as a **directory** (`services/caddy/` → `/etc/caddy/`), not as a single file. Mounting individual files breaks after edits because most editors save by creating a new file (new inode), leaving the container's bind mount pointing at the old inode.
 
-After editing the Caddyfile, reload Caddy without restarting:
-```bash
-podman exec caddy caddy reload --config /etc/caddy/Caddyfile
-```
-
-After editing a Quadlet `.container` file, just reload and restart — the symlink means systemd already sees the updated file:
-```bash
-systemctl --user daemon-reload && systemctl --user restart <service>
-```
-
 ### 6. Syncthing
 
 ```bash
@@ -149,6 +144,57 @@ podman exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 Access the Syncthing UI at `https://sync.abhijithb.org` to configure folders and devices.
 
+### 7. Filebrowser
+
+```bash
+mkdir -p ~/.local/share/containers/homelab/filebrowser/db
+ln -sf ~/git/homelab/quadlet/filebrowser.container ~/.config/containers/systemd/filebrowser.container
+systemctl --user daemon-reload
+systemctl --user start filebrowser
+```
+
+> **Note:** If the `db` directory was previously created by the container (owned by a remapped UID), fix ownership before starting: `sudo chown -R $USER: ~/.local/share/containers/homelab/filebrowser/`
+
+On first start, Filebrowser creates an admin account with a randomly generated password. If you want to keep auth enabled, find the password in the logs:
+
+```bash
+podman logs filebrowser | grep password
+```
+
+To disable auth instead (safe since it's Tailscale-only):
+
+```bash
+systemctl --user stop filebrowser
+podman run --rm --userns=keep-id --security-opt label=disable \
+  -v ~/.local/share/containers/homelab/filebrowser/db:/database \
+  docker.io/filebrowser/filebrowser:v2.63.5 \
+  config set --auth.method=noauth --database /database/filebrowser.db
+systemctl --user start filebrowser
+```
+
+> **Note:** `UserNS=keep-id` is required in the Quadlet file. Without it, the container process runs as a remapped UID (~525287) that cannot read the home directory.
+
+Then add the Caddyfile entry and reload:
+```bash
+# Add to services/caddy/Caddyfile:
+# files.abhijithb.org {
+#     reverse_proxy filebrowser:8080
+# }
+podman exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+## Day-to-day operations
+
+**Reload Caddy after editing the Caddyfile:**
+```bash
+podman exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+**Restart a service after editing its Quadlet file** (the symlink means systemd already sees the updated file):
+```bash
+systemctl --user daemon-reload && systemctl --user restart <service>
+```
+
 ### DNS records (Cloudflare)
 
 Add an A record for each service pointing to your Tailscale IP. Cloudflare automatically sets these to DNS-only since `100.x.x.x` is a private IP range:
@@ -156,4 +202,5 @@ Add an A record for each service pointing to your Tailscale IP. Cloudflare autom
 ```
 cockpit.abhijithb.org  →  <tailscale-ip>
 sync.abhijithb.org     →  <tailscale-ip>
+files.abhijithb.org    →  <tailscale-ip>
 ```

@@ -11,3 +11,7 @@
 sync.abhijithb.org {
 	reverse_proxy syncthing:8384
 }
+
+files.abhijithb.org {
+    reverse_proxy filebrowser:8080
+}

@@ -37,94 +37,88 @@ Compose is the more common choice and has better documentation online, but it is
 
 Clone this repo wherever you like. All Quadlet volume mounts assume `~/git/homelab` — if you use a different path, update the `Volume=` lines in the `.container` files accordingly.
 
-### 1. Tailscale
+### 1. Run the bootstrap script
+
+```bash
+bash scripts/bootstrap.sh
+```
+
+The script handles: user lingering, unprivileged ports (80/443), Cockpit install, firewall config, Quadlet symlinks, data directories, and starting all services.
+
+You will be prompted to pause at two points:
+- **Tailscale auth** — run `sudo tailscale up` and complete browser login
+- **Cloudflare API token** — create a token with `Zone → DNS → Edit` permission in the Cloudflare dashboard, then set `CF_API_TOKEN` in `services/caddy/.env`
+
+### 2. DNS records (Cloudflare)
+
+After the script completes it prints your Tailscale IP. Add an A record for each service in the Cloudflare dashboard pointing to that IP. Cloudflare automatically sets these to DNS-only since `100.x.x.x` is a private IP range:
+
+```
+cockpit.abhijithb.org  →  <tailscale-ip>
+sync.abhijithb.org     →  <tailscale-ip>
+files.abhijithb.org    →  <tailscale-ip>
+```
+
+Access Cockpit at `https://cockpit.abhijithb.org:9090` — accept the self-signed cert warning once and log in with your Fedora username and password.
+
+> **Note:** `systemctl --user enable` fails for Quadlet-generated units — this is expected. Autostart on boot is already handled by `WantedBy=default.target` in the `.container` file.
+
+### Manual setup (reference)
+
+The steps below document what the bootstrap script does, useful if you need to re-run a single step or debug a failure.
+
+#### Tailscale
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo systemctl enable --now tailscaled
-
-# Authenticate — opens a browser URL to link the device to your Tailscale account
 sudo tailscale up
-
-# Note your Tailscale IP, used for all DNS records
 tailscale ip -4
 ```
 
-### 2. Firewall
-
-Fedora's firewalld doesn't automatically trust the Tailscale interface. Add it to the trusted zone so services are reachable over VPN:
+#### Firewall
 
 ```bash
 sudo firewall-cmd --permanent --zone=trusted --add-interface=tailscale0
 sudo firewall-cmd --reload
 ```
 
-### 3. Enable user lingering
-
-Ensures Quadlet services start on boot even when no user is logged in — critical for the "laptop turns on, everything just works" flow:
+#### User lingering
 
 ```bash
 loginctl enable-linger $USER
 ```
 
-### 4. Cockpit
-
-Cockpit ships in the Fedora repos. It gives a full system dashboard accessible from any browser:
+#### Cockpit
 
 ```bash
 sudo dnf install cockpit
 sudo systemctl enable --now cockpit.socket
 ```
 
-Access at `https://cockpit.abhijithb.org:9090`. Accept the self-signed cert warning once (Cockpit generates its own cert for the machine hostname), then log in with your Fedora username and password.
-
 > **Note:** Cockpit cannot be reverse proxied through Caddy — it causes a redirect loop due to how Cockpit handles the Host header. Access it directly on port 9090.
 
-### 5. Caddy (reverse proxy)
-
-Caddy handles TLS for all containerised services using the Cloudflare DNS-01 challenge — no public access required.
-
-**5a. Cloudflare API token**
-
-In Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom Token:
-- Permissions: `Zone → DNS → Edit`
-
-**5b. Allow rootless Podman to bind ports 80 and 443**
+#### Caddy
 
 ```bash
 echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee /etc/sysctl.d/99-unprivileged-ports.conf
 sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
-```
 
-**5c. Create data directories**
-
-```bash
 mkdir -p ~/.local/share/containers/homelab/caddy/{data,config}
 mkdir -p ~/.config/containers/systemd
-```
 
-**5d. Environment file**
-
-```bash
 cp services/caddy/.env.example services/caddy/.env
-# Edit .env and set CF_API_TOKEN to your Cloudflare API token
-```
+# Edit .env and set CF_API_TOKEN
 
-**5e. Symlink Quadlet files and start**
-
-Run from the repo root:
-```bash
 ln -sf "$PWD/quadlet/homelab.network" ~/.config/containers/systemd/homelab.network
 ln -sf "$PWD/quadlet/caddy.container" ~/.config/containers/systemd/caddy.container
 systemctl --user daemon-reload
 systemctl --user start caddy
 ```
 
-> **Note:** `systemctl --user enable` fails for Quadlet-generated units — this is expected. Autostart on boot is already handled by `WantedBy=default.target` in the `.container` file.
-
 > **Note:** The Caddyfile volume is mounted as a **directory** (`services/caddy/` → `/etc/caddy/`), not as a single file. Mounting individual files breaks after edits because most editors save by creating a new file (new inode), leaving the container's bind mount pointing at the old inode.
 
-### 6. Syncthing
+#### Syncthing
 
 ```bash
 mkdir -p ~/.local/share/containers/homelab/syncthing/data
@@ -133,18 +127,7 @@ systemctl --user daemon-reload
 systemctl --user start syncthing
 ```
 
-Then add the Caddyfile entry and reload:
-```bash
-# Add to services/caddy/Caddyfile:
-# sync.abhijithb.org {
-#     reverse_proxy syncthing:8384
-# }
-podman exec caddy caddy reload --config /etc/caddy/Caddyfile
-```
-
-Access the Syncthing UI at `https://sync.abhijithb.org` to configure folders and devices.
-
-### 7. Filebrowser
+#### Filebrowser
 
 ```bash
 mkdir -p ~/.local/share/containers/homelab/filebrowser/db
@@ -155,7 +138,7 @@ systemctl --user start filebrowser
 
 > **Note:** If the `db` directory was previously created by the container (owned by a remapped UID), fix ownership before starting: `sudo chown -R $USER: ~/.local/share/containers/homelab/filebrowser/`
 
-On first start, Filebrowser creates an admin account with a randomly generated password. If you want to keep auth enabled, find the password in the logs:
+On first start, Filebrowser creates an admin account with a randomly generated password. Find it in the logs:
 
 ```bash
 podman logs filebrowser | grep password
@@ -173,15 +156,6 @@ systemctl --user start filebrowser
 ```
 
 > **Note:** `UserNS=keep-id` is required in the Quadlet file. Without it, the container process runs as a remapped UID (~525287) that cannot read the home directory.
-
-Then add the Caddyfile entry and reload:
-```bash
-# Add to services/caddy/Caddyfile:
-# files.abhijithb.org {
-#     reverse_proxy filebrowser:8080
-# }
-podman exec caddy caddy reload --config /etc/caddy/Caddyfile
-```
 
 ## Day-to-day operations
 

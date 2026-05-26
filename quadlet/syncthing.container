@@ -1,0 +1,17 @@
+[Unit]
+Description=Syncthing file sync
+After=network-online.target
+
+[Container]
+Image=docker.io/syncthing/syncthing:2.1
+ContainerName=syncthing
+Network=homelab.network
+Volume=%h/.local/share/containers/homelab/syncthing/data:/var/syncthing:Z
+Environment=PUID=1000
+Environment=PGID=1000
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Homelab shared network
+
+[Network]
+NetworkName=homelab
+
+

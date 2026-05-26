@@ -1,0 +1,20 @@
+[Unit]
+Description=Caddy reverse proxy
+After=network-online.target
+
+[Container]
+Image=ghcr.io/serfriz/caddy-cloudflare:latest
+ContainerName=caddy
+Network=homelab.network
+PublishPort=80:80
+PublishPort=443:443
+Volume=%h/.local/share/containers/homelab/caddy/data:/data:Z
+Volume=%h/.local/share/containers/homelab/caddy/config:/config:Z
+Volume=%h/git/homelab/services/caddy:/etc/caddy:Z,ro
+EnvironmentFile=%h/git/homelab/services/caddy/.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

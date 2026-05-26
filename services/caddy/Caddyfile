@@ -1,0 +1,13 @@
+{
+    acme_dns cloudflare {env.CF_API_TOKEN}
+}
+
+# containerised services go here
+# example:
+# files.abhijithb.org {
+#     reverse_proxy filebrowser:80
+# }
+
+sync.abhijithb.org {
+	reverse_proxy syncthing:8384
+}

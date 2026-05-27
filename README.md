@@ -31,6 +31,7 @@ Compose is the more common choice and has better documentation online, but it is
 | Syncthing | `https://sync.abhijithb.org` | Continuous file sync between devices |
 | Filebrowser | `https://files.abhijithb.org` | Web file manager for browsing and managing files on the laptop |
 | Jellyfin | `https://media.abhijithb.org` | Media streaming — movies, TV shows, anime |
+| Cloudflare Tunnel | public hostnames | Exposes public services without opening ports. `cloudflared` dials out to Cloudflare — no port forwarding needed. |
 
 ## Setting up from scratch
 
@@ -46,9 +47,10 @@ bash scripts/bootstrap.sh
 
 The script handles: user lingering, unprivileged ports (80/443), Cockpit install, firewall config, Quadlet symlinks, data directories, and starting all services.
 
-You will be prompted to pause at two points:
+You will be prompted to pause at three points:
 - **Tailscale auth** — run `sudo tailscale up` and complete browser login
 - **Cloudflare API token** — create a token with `Zone → DNS → Edit` permission in the Cloudflare dashboard, then set `CF_API_TOKEN` in `services/caddy/.env`
+- **Cloudflare Tunnel token** — create a tunnel in Zero Trust → Networks → Tunnels, copy the token, and set `TUNNEL_TOKEN` in `services/cloudflared/.env`
 
 ### 2. DNS records (Cloudflare)
 
@@ -239,6 +241,46 @@ sudo systemctl enable jellyfin-drive-restart.service
 Add the path as a library in the UI (Dashboard → Libraries → Add Media Library → `/external`). Turn off **"Delete media from library when files are removed from disk"** in library settings to keep metadata when the drive is unplugged.
 
 **Unplugging / re-attaching the drive:** Jellyfin marks those items unavailable when the drive is gone and restores them on re-attach. The `nofail` fstab option ensures the laptop boots normally even if the drive is absent — Jellyfin starts with an empty `/external` and continues working for local media. When the drive is plugged back in, `mnt-elements.mount` activates and `jellyfin-drive-restart.service` automatically restarts the container so it picks up the new mount.
+
+## Cloudflare Tunnel
+
+Exposes public services without opening any ports on the router. `cloudflared` dials out to Cloudflare and keeps a persistent tunnel alive — Cloudflare proxies inbound public traffic through it to Caddy.
+
+```
+Internet → Cloudflare edge → tunnel (outbound) → cloudflared → Caddy → service
+```
+
+Private services (Filebrowser, Jellyfin, etc.) are never routed through the tunnel — they remain Tailscale-only.
+
+**Setup:**
+
+1. Go to [Cloudflare dashboard](https://dash.cloudflare.com) → Networking → Tunnels → Create tunnel
+2. Copy the token and set it in `services/cloudflared/.env`:
+   ```bash
+   TUNNEL_TOKEN=<your-token>
+   ```
+3. Start the service:
+   ```bash
+   systemctl --user daemon-reload && systemctl --user start cloudflared
+   podman logs cloudflared  # should show: Connection established
+   ```
+
+**Adding a public hostname:**
+
+In the tunnel dashboard -> your tunnel -> Routes -> Add route :
+- Subdomain: `<name>`, Domain: `abhijithb.org`
+- Service: `HTTP` → `caddy:80`
+
+Then add a matching block in the Caddyfile:
+```
+http://name.abhijithb.org {
+    reverse_proxy <container>:<port>
+}
+```
+
+Reload Caddy: `podman exec caddy caddy reload --config /etc/caddy/Caddyfile`
+TLS certs are handled by cloudflare
+Cloudflare automatically creates the DNS record — no manual DNS step needed for tunnel hostnames.
 
 ## Tailscale features
 

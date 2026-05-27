@@ -91,11 +91,18 @@ if [ ! -f "$REPO_DIR/services/caddy/.env" ]; then
     read -r _
 fi
 
+if [ ! -f "$REPO_DIR/services/cloudflared/.env" ]; then
+    cp "$REPO_DIR/services/cloudflared/.env.example" "$REPO_DIR/services/cloudflared/.env"
+    echo ""
+    echo "  Create a tunnel at  Networking -> Tunnels, then set TUNNEL_TOKEN in services/cloudflared/.env and press Enter."
+    read -r _
+fi
+
 step "8. Start services"
 
 systemctl --user daemon-reload
 
-for service in caddy syncthing filebrowser jellyfin; do
+for service in caddy syncthing filebrowser jellyfin cloudflared; do
     systemctl --user start "$service"
     if systemctl --user is-active --quiet "$service"; then
         echo "  started $service"

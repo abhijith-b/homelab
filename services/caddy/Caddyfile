@@ -19,3 +19,7 @@ files.abhijithb.org {
 media.abhijithb.org {
 	reverse_proxy jellyfin:8096
 }
+
+http://test.abhijithb.org {
+    respond "cf tunnel works" 200
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare Tunnel
+After=network-online.target
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:2026.5.2
+ContainerName=cloudflared
+Network=homelab.network
+EnvironmentFile=%h/git/homelab/services/cloudflared/.env
+Exec=tunnel --no-autoupdate run
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

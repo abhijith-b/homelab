@@ -3,7 +3,7 @@ Description=Caddy reverse proxy
 After=network-online.target
 
 [Container]
-Image=ghcr.io/serfriz/caddy-cloudflare:latest
+Image=ghcr.io/serfriz/caddy-cloudflare:2.11.3
 ContainerName=caddy
 Network=homelab.network
 PublishPort=80:80

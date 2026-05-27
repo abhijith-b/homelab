@@ -308,13 +308,3 @@ podman exec caddy caddy reload --config /etc/caddy/Caddyfile
 systemctl --user daemon-reload && systemctl --user restart <service>
 ```
 
-### DNS records (Cloudflare)
-
-Add an A record for each service pointing to your Tailscale IP. Cloudflare automatically sets these to DNS-only since `100.x.x.x` is a private IP range:
-
-```
-cockpit.abhijithb.org  →  <tailscale-ip>
-sync.abhijithb.org     →  <tailscale-ip>
-files.abhijithb.org    →  <tailscale-ip>
-media.abhijithb.org    →  <tailscale-ip>
-```

@@ -42,7 +42,7 @@ step "4. External drive hot-plug (Jellyfin)"
 # is frozen with an empty /external. Plugging the drive in later doesn't help — the container
 # needs a restart to pick up the new mount. This system service restarts Jellyfin automatically
 # whenever mnt-elements.mount activates (boot with drive present, or hot-plug after boot).
-sudo tee /etc/systemd/system/jellyfin-drive-restart.service > /dev/null << 'EOF'
+sudo tee /etc/systemd/system/jellyfin-drive-restart.service > /dev/null << EOF
 [Unit]
 Description=Restart Jellyfin container when external drive mounts
 After=mnt-elements.mount
@@ -50,7 +50,7 @@ BindsTo=mnt-elements.mount
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/systemctl --machine=fedora@.host --user restart jellyfin
+ExecStart=/usr/bin/systemctl --machine=${USER}@.host --user restart jellyfin
 RemainAfterExit=no
 
 [Install]
@@ -97,7 +97,11 @@ systemctl --user daemon-reload
 
 for service in caddy syncthing filebrowser jellyfin; do
     systemctl --user start "$service"
-    echo "  started $service"
+    if systemctl --user is-active --quiet "$service"; then
+        echo "  started $service"
+    else
+        echo "  WARNING: $service failed to start — check: podman logs $service"
+    fi
 done
 
 
@@ -105,6 +109,8 @@ echo ""
 echo "All done. Remaining manual steps:"
 echo "  1. Add DNS A records in Cloudflare pointing to: $(tailscale ip -4)"
 echo "     cockpit.abhijithb.org, sync.abhijithb.org, files.abhijithb.org, media.abhijithb.org"
-echo "  2. Jellyfin: update the Volume= media path in quadlet/jellyfin.container if needed"
-echo "  3. Jellyfin: add your media library at Dashboard → Libraries after first login"
-echo "  4. Check service logs: podman logs <service>"
+echo "  2. External drive: create /mnt/elements and add an fstab entry for your drive UUID"
+echo "     See README → Jellyfin → External HDD setup for the exact fstab line"
+echo "  3. Jellyfin: update the Volume= media path in quadlet/jellyfin.container if needed"
+echo "  4. Jellyfin: add your media library at Dashboard → Libraries after first login"
+echo "  5. Check service logs: podman logs <service>"

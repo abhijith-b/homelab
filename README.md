@@ -30,6 +30,7 @@ Compose is the more common choice and has better documentation online, but it is
 | Caddy | internal | Reverse proxy for all containerised services. Handles TLS automatically. |
 | Syncthing | `https://sync.abhijithb.org` | Continuous file sync between devices |
 | Filebrowser | `https://files.abhijithb.org` | Web file manager for browsing and managing files on the laptop |
+| Jellyfin | `https://media.abhijithb.org` | Media streaming — movies, TV shows, anime |
 
 ## Setting up from scratch
 
@@ -57,6 +58,7 @@ After the script completes it prints your Tailscale IP. Add an A record for each
 cockpit.abhijithb.org  →  <tailscale-ip>
 sync.abhijithb.org     →  <tailscale-ip>
 files.abhijithb.org    →  <tailscale-ip>
+media.abhijithb.org    →  <tailscale-ip>
 ```
 
 Access Cockpit at `https://cockpit.abhijithb.org:9090` — accept the self-signed cert warning once and log in with your Fedora username and password.
@@ -157,6 +159,42 @@ systemctl --user start filebrowser
 
 > **Note:** `UserNS=keep-id` is required in the Quadlet file. Without it, the container process runs as a remapped UID (~525287) that cannot read the home directory.
 
+#### Jellyfin
+
+```bash
+mkdir -p ~/.local/share/containers/homelab/jellyfin/{config,cache}
+ln -sf ~/git/homelab/quadlet/jellyfin.container ~/.config/containers/systemd/jellyfin.container
+systemctl --user daemon-reload
+systemctl --user start jellyfin
+```
+
+Update the `Volume=` line in `quadlet/jellyfin.container` to point to your media directory before starting.
+
+**Hardware acceleration:**
+
+Jellyfin can offload transcoding to the GPU via Intel QSV, VAAPI, NVENC, etc. First allow the container to access the render device:
+
+```bash
+# For container-selinux 2.226+
+sudo setsebool -P container_use_dri_devices 1
+```
+
+Add `AddDevice=/dev/dri/:/dev/dri/` to the `[Container]` section of the Quadlet file, then in Jellyfin:
+
+> Dashboard → Playback → Transcoding → Hardware Acceleration → select your GPU type
+
+Enable only the codecs your GPU actually supports — enabling unsupported ones (e.g. AV1 on older Intel iGPUs) causes ffmpeg to crash-loop at high CPU whenever that codec is encountered. Check your GPU's hardware decode capabilities before ticking boxes.
+
+**Adding a media library:**
+
+Jellyfin does not auto-discover media. After first start, go to:
+
+> Dashboard → Libraries → Add Media Library → set the folder to the path inside the container (e.g. `/media`)
+
+**Attaching an external drive temporarily:**
+
+Add a `Volume=` line for the mount point, restart the container, then add the path as a library in the UI. When removing the drive, Jellyfin marks those items unavailable and restores them when the drive is re-attached. Turn off **"Delete media from library when files are removed from disk"** in the library settings to avoid losing metadata on disconnect.
+
 ## Tailscale features
 
 ### Subnet router
@@ -233,4 +271,5 @@ Add an A record for each service pointing to your Tailscale IP. Cloudflare autom
 cockpit.abhijithb.org  →  <tailscale-ip>
 sync.abhijithb.org     →  <tailscale-ip>
 files.abhijithb.org    →  <tailscale-ip>
+media.abhijithb.org    →  <tailscale-ip>
 ```

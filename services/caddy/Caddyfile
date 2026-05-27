@@ -13,5 +13,9 @@ sync.abhijithb.org {
 }
 
 files.abhijithb.org {
-    reverse_proxy filebrowser:8080
+	reverse_proxy filebrowser:8080
+}
+
+media.abhijithb.org {
+	reverse_proxy jellyfin:8096
 }

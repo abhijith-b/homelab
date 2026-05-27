@@ -16,6 +16,9 @@ sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
 sudo dnf install -y cockpit
 sudo systemctl enable --now cockpit.socket
 
+# Allow containers to access DRI devices (required for Jellyfin hardware acceleration)
+sudo setsebool -P container_use_dri_devices 1
+
 step "2. Tailscale"
 
 if ! command -v tailscale &>/dev/null; then
@@ -50,7 +53,9 @@ mkdir -p \
     ~/.local/share/containers/homelab/caddy/data \
     ~/.local/share/containers/homelab/caddy/config \
     ~/.local/share/containers/homelab/syncthing/data \
-    ~/.local/share/containers/homelab/filebrowser/db
+    ~/.local/share/containers/homelab/filebrowser/db \
+    ~/.local/share/containers/homelab/jellyfin/config \
+    ~/.local/share/containers/homelab/jellyfin/cache
 
 
 step "6. Environment files"
@@ -66,7 +71,7 @@ step "7. Start services"
 
 systemctl --user daemon-reload
 
-for service in caddy syncthing filebrowser; do
+for service in caddy syncthing filebrowser jellyfin; do
     systemctl --user start "$service"
     echo "  started $service"
 done
@@ -75,4 +80,7 @@ done
 echo ""
 echo "All done. Remaining manual steps:"
 echo "  1. Add DNS A records in Cloudflare pointing to: $(tailscale ip -4)"
-echo "  2. Check service logs: podman logs <service>"
+echo "     cockpit.abhijithb.org, sync.abhijithb.org, files.abhijithb.org, media.abhijithb.org"
+echo "  2. Jellyfin: update the Volume= media path in quadlet/jellyfin.container if needed"
+echo "  3. Jellyfin: add your media library at Dashboard → Libraries after first login"
+echo "  4. Check service logs: podman logs <service>"

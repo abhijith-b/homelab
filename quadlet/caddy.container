@@ -14,7 +14,7 @@ Volume=%h/git/homelab/services/caddy:/etc/caddy:Z,ro
 EnvironmentFile=%h/git/homelab/services/caddy/.env
 
 [Service]
-Restart=always
+Restart=on-failure
 
 [Install]
 WantedBy=default.target

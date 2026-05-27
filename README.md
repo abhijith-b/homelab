@@ -191,9 +191,54 @@ Jellyfin does not auto-discover media. After first start, go to:
 
 > Dashboard → Libraries → Add Media Library → set the folder to the path inside the container (e.g. `/media`)
 
-**Attaching an external drive temporarily:**
+**External HDD setup (auto-mount at boot):**
 
-Add a `Volume=` line for the mount point, restart the container, then add the path as a library in the UI. When removing the drive, Jellyfin marks those items unavailable and restores them when the drive is re-attached. Turn off **"Delete media from library when files are removed from disk"** in the library settings to avoid losing metadata on disconnect.
+The external drive must be mounted at a fixed system path — not the udisks2 automount path (`/run/media/fedora/Elements`) which only appears after a desktop login. Jellyfin starts at boot before any login, so it needs the drive available at a stable path.
+
+```bash
+# 1. Create the mount point
+sudo mkdir -p /mnt/elements
+
+# 2. Add to /etc/fstab (use your drive's UUID from: lsblk -o NAME,UUID,LABEL)
+#    ntfs3 = fast kernel NTFS driver; nofail = boot normally if drive is absent
+#    context= sets the SELinux label at mount time (NTFS can't store xattr labels itself)
+echo 'UUID=<your-uuid> /mnt/elements ntfs3 uid=1000,gid=1000,nofail,context=system_u:object_r:container_file_t:s0 0 0' | sudo tee -a /etc/fstab
+
+# 3. Test without rebooting (must unmount first if already mounted — context= can't be applied via remount)
+sudo systemctl daemon-reload
+sudo umount /mnt/elements 2>/dev/null; sudo mount /mnt/elements
+
+# 4. Update quadlet/jellyfin.container:
+#    - Volume=/mnt/elements:/external:ro   (no :Z — NTFS can't store SELinux xattrs)
+#    - SecurityLabelDisable=true           (required: NTFS xattr limitation causes silent SELinux deny otherwise)
+#    - After=network-online.target mnt-elements.mount
+systemctl --user daemon-reload && systemctl --user restart jellyfin
+
+# 5. Create a system service so Jellyfin restarts automatically when the drive is hot-plugged
+#    Background: a container's mount namespace is frozen at start time. If the drive wasn't
+#    present at boot, /external inside the container stays empty even after the drive mounts
+#    later — Jellyfin won't see it without a restart. This service handles that automatically.
+sudo tee /etc/systemd/system/jellyfin-drive-restart.service << 'EOF'
+[Unit]
+Description=Restart Jellyfin container when external drive mounts
+After=mnt-elements.mount
+BindsTo=mnt-elements.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --machine=fedora@.host --user restart jellyfin
+RemainAfterExit=no
+
+[Install]
+WantedBy=mnt-elements.mount
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable jellyfin-drive-restart.service
+```
+
+Add the path as a library in the UI (Dashboard → Libraries → Add Media Library → `/external`). Turn off **"Delete media from library when files are removed from disk"** in library settings to keep metadata when the drive is unplugged.
+
+**Unplugging / re-attaching the drive:** Jellyfin marks those items unavailable when the drive is gone and restores them on re-attach. The `nofail` fstab option ensures the laptop boots normally even if the drive is absent — Jellyfin starts with an empty `/external` and continues working for local media. When the drive is plugged back in, `mnt-elements.mount` activates and `jellyfin-drive-restart.service` automatically restarts the container so it picks up the new mount.
 
 ## Tailscale features
 

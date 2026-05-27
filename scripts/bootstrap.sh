@@ -36,7 +36,31 @@ step "3. Firewall"
 sudo firewall-cmd --permanent --zone=trusted --add-interface=tailscale0
 sudo firewall-cmd --reload
 
-step "4. Quadlet symlinks"
+step "4. External drive hot-plug (Jellyfin)"
+
+# When Jellyfin starts before the external drive is mounted, its container mount namespace
+# is frozen with an empty /external. Plugging the drive in later doesn't help — the container
+# needs a restart to pick up the new mount. This system service restarts Jellyfin automatically
+# whenever mnt-elements.mount activates (boot with drive present, or hot-plug after boot).
+sudo tee /etc/systemd/system/jellyfin-drive-restart.service > /dev/null << 'EOF'
+[Unit]
+Description=Restart Jellyfin container when external drive mounts
+After=mnt-elements.mount
+BindsTo=mnt-elements.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --machine=fedora@.host --user restart jellyfin
+RemainAfterExit=no
+
+[Install]
+WantedBy=mnt-elements.mount
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable jellyfin-drive-restart.service
+echo "  jellyfin-drive-restart.service enabled"
+
+step "5. Quadlet symlinks"
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SYSTEMD_DIR="$HOME/.config/containers/systemd"
@@ -47,7 +71,7 @@ for unit in "$REPO_DIR"/quadlet/*; do
     ln -sf "$unit" "$SYSTEMD_DIR/$(basename "$unit")"
 done
 
-step "5. Data directories"
+step "6. Data directories"
 
 mkdir -p \
     ~/.local/share/containers/homelab/caddy/data \
@@ -58,7 +82,7 @@ mkdir -p \
     ~/.local/share/containers/homelab/jellyfin/cache
 
 
-step "6. Environment files"
+step "7. Environment files"
 
 if [ ! -f "$REPO_DIR/services/caddy/.env" ]; then
     cp "$REPO_DIR/services/caddy/.env.example" "$REPO_DIR/services/caddy/.env"
@@ -67,7 +91,7 @@ if [ ! -f "$REPO_DIR/services/caddy/.env" ]; then
     read -r _
 fi
 
-step "7. Start services"
+step "8. Start services"
 
 systemctl --user daemon-reload
 

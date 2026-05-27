@@ -1,24 +1,27 @@
 [Unit]
 Description=Jellyfin - Media streaming server
-After=network-online.target
+After=network-online.target mnt-elements.mount
+Wants=mnt-elements.mount
 
 [Container]
 Image=docker.io/jellyfin/jellyfin:10.11.10
 ContainerName=jellyfin
 Network=homelab.network
+# Expose port for TV access over LAN
+PublishPort=8096:8096
 
 UserNS=keep-id
-#SecurityLabelDisable=true
+SecurityLabelDisable=true
 AddDevice=/dev/dri/:/dev/dri/
 
 Volume=%h/.local/share/containers/homelab/jellyfin/config:/config:Z
 Volume=%h/.local/share/containers/homelab/jellyfin/cache:/cache:Z
-# Mount your media read-only — adjust the host path to wherever your files live
 Volume=/home/fedora/Videos:/media:ro,Z
-Volume=/run/media/fedora/Elements:/external:ro,Z
+Volume=/mnt/elements:/external:ro
 
 [Service]
-Restart=always
+Restart=on-failure
+TimeoutStopSec=60
 
 [Install]
 WantedBy=default.target

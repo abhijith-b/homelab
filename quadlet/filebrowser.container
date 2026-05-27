@@ -16,7 +16,7 @@ Volume=%h/.local/share/containers/homelab/filebrowser/db:/database
 Volume=%h:/srv
 
 [Service]
-Restart=always
+Restart=on-failure
 
 [Install]
 WantedBy=default.target

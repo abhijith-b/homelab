@@ -98,7 +98,7 @@ sudo dnf install cockpit
 sudo systemctl enable --now cockpit.socket
 ```
 
-> **Note:** Cockpit cannot be reverse proxied through Caddy — it causes a redirect loop due to how Cockpit handles the Host header. Access it directly on port 9090.
+> **Note:** i couldn't make Cockpit reverse proxied through Caddy so i left it for now — it causes a redirect loop due to how Cockpit handles the Host header. Access it directly on port 9090.
 
 #### Caddy
 

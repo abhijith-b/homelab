@@ -1,6 +1,6 @@
 [Unit]
 Description=Filebrowser - Web file manager
-After=network-online.target
+After=network-online.target mnt-elements.mount
 
 [Container]
 Image=docker.io/filebrowser/filebrowser:v2.63.5
@@ -14,6 +14,7 @@ UserNS=keep-id
 Volume=%h/git/homelab/services/filebrowser/config:/config
 Volume=%h/.local/share/containers/homelab/filebrowser/db:/database
 Volume=%h:/srv
+Volume=/mnt/elements:/srv/elements:ro
 
 [Service]
 Restart=on-failure

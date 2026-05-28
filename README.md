@@ -279,8 +279,7 @@ http://name.abhijithb.org {
 ```
 
 Reload Caddy: `podman exec caddy caddy reload --config /etc/caddy/Caddyfile`
-TLS certs are handled by cloudflare
-Cloudflare automatically creates the DNS record — no manual DNS step needed for tunnel hostnames.
+Cloudflare automatically creates the DNS record — no manual DNS step needed for tunnel hostnames. Also, TLS certs are handled by cloudflare.
 
 ## Tailscale features
 

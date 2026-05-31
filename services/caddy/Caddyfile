@@ -20,6 +20,31 @@ media.abhijithb.org {
 	reverse_proxy jellyfin:8096
 }
 
+photos.abhijithb.org {
+	reverse_proxy ente-web:3000
+}
+
+photos-api.abhijithb.org {
+	reverse_proxy ente-museum:8080
+}
+
+storage.abhijithb.org {
+	@options method OPTIONS
+	handle @options {
+		header Access-Control-Allow-Origin "*"
+		header Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+		header Access-Control-Allow-Headers "*"
+		header Access-Control-Max-Age "86400"
+		respond 204
+	}
+	handle {
+		header Access-Control-Allow-Origin "*"
+		header Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+		header Access-Control-Allow-Headers "*"
+		reverse_proxy garage:3900
+	}
+}
+
 http://test.abhijithb.org {
     respond "cf tunnel works" 200
 }

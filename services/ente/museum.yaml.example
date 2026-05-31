@@ -1,0 +1,42 @@
+db:
+  host: ente-postgres
+  port: 5432
+  name: ente_db
+  user: pguser
+  password: REPLACE_WITH_POSTGRES_PASSWORD   # must match POSTGRES_PASSWORD in .env
+
+s3:
+  # false = use HTTPS; browser uploads go directly to storage.abhijithb.org
+  are_local_buckets: false
+  use_path_style_urls: true
+  b2-eu-cen:
+    key: REPLACE_WITH_GARAGE_KEY_ID
+    secret: REPLACE_WITH_GARAGE_SECRET
+    endpoint: storage.abhijithb.org
+    region: garage
+    bucket: b2-eu-cen
+  wasabi-eu-central-2-v3:
+    key: REPLACE_WITH_GARAGE_KEY_ID
+    secret: REPLACE_WITH_GARAGE_SECRET
+    endpoint: storage.abhijithb.org
+    region: garage
+    bucket: wasabi-eu-central-2-v3
+  scw-eu-fr-v3:
+    key: REPLACE_WITH_GARAGE_KEY_ID
+    secret: REPLACE_WITH_GARAGE_SECRET
+    endpoint: storage.abhijithb.org
+    region: garage
+    bucket: scw-eu-fr-v3
+
+apps:
+  public-albums: https://photos.abhijithb.org
+
+# Generate with: head -c 32 /dev/urandom | base64 | tr -d '\n'
+key:
+  encryption: REPLACE_WITH_ENCRYPTION_KEY
+  # Generate with: head -c 64 /dev/urandom | base64 | tr -d '\n'
+  hash: REPLACE_WITH_HASH_KEY
+
+# Generate with: head -c 32 /dev/urandom | base64 | tr -d '\n' | tr '+/' '-_'
+jwt:
+  secret: REPLACE_WITH_JWT_SECRET

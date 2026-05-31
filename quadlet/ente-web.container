@@ -1,0 +1,18 @@
+[Unit]
+Description=Ente web frontend
+After=network-online.target ente-museum.service
+
+[Container]
+# Same as ente-museum: pin to digest after pulling
+Image=ghcr.io/ente-io/web:latest
+ContainerName=ente-web
+Network=homelab.network
+
+# Must be the URL the browser uses to reach museum — Tailscale-accessible
+Environment=ENTE_API_ORIGIN=https://photos-api.abhijithb.org
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

@@ -31,6 +31,7 @@ Compose is the more common choice and has better documentation online, but it is
 | Syncthing | `https://sync.abhijithb.org` | Continuous file sync between devices |
 | Filebrowser | `https://files.abhijithb.org` | Web file manager for browsing and managing files on the laptop |
 | Jellyfin | `https://media.abhijithb.org` | Media streaming — movies, TV shows, anime |
+| Ente Photos | `https://photos.abhijithb.org` | E2EE photo backup and gallery (Google Photos replacement) |
 | Cloudflare Tunnel | public hostnames | Exposes public services without opening ports. `cloudflared` dials out to Cloudflare — no port forwarding needed. |
 
 ## Setting up from scratch
@@ -45,6 +46,12 @@ Clone this repo wherever you like. All Quadlet volume mounts assume `~/git/homel
 bash scripts/bootstrap.sh
 ```
 
+Run with `--dry-run` first to see every command without executing anything:
+
+```bash
+bash scripts/bootstrap.sh --dry-run
+```
+
 The script handles: user lingering, unprivileged ports (80/443), Cockpit install, firewall config, Quadlet symlinks, data directories, and starting all services.
 
 You will be prompted to pause at three points:
@@ -57,15 +64,23 @@ You will be prompted to pause at three points:
 After the script completes it prints your Tailscale IP. Add an A record for each service in the Cloudflare dashboard pointing to that IP. Cloudflare automatically sets these to DNS-only since `100.x.x.x` is a private IP range:
 
 ```
-cockpit.abhijithb.org  →  <tailscale-ip>
-sync.abhijithb.org     →  <tailscale-ip>
-files.abhijithb.org    →  <tailscale-ip>
-media.abhijithb.org    →  <tailscale-ip>
+cockpit.abhijithb.org     →  <tailscale-ip>
+sync.abhijithb.org        →  <tailscale-ip>
+files.abhijithb.org       →  <tailscale-ip>
+media.abhijithb.org       →  <tailscale-ip>
 ```
 
 Access Cockpit at `https://cockpit.abhijithb.org:9090` — accept the self-signed cert warning once and log in with your Fedora username and password.
 
 > **Note:** `systemctl --user enable` fails for Quadlet-generated units — this is expected. Autostart on boot is already handled by `WantedBy=default.target` in the `.container` file.
+
+### 3. Ente Photos (optional)
+
+For self-hosted photo backup, Ente has its own setup script. See [Ente Photos](#ente-photos) for the config steps to complete first, then run:
+
+```bash
+bash scripts/ente-bootstrap.sh
+```
 
 ### Manual setup (reference)
 
@@ -241,6 +256,109 @@ sudo systemctl enable jellyfin-drive-restart.service
 Add the path as a library in the UI (Dashboard → Libraries → Add Media Library → `/external`). Turn off **"Delete media from library when files are removed from disk"** in library settings to keep metadata when the drive is unplugged.
 
 **Unplugging / re-attaching the drive:** Jellyfin marks those items unavailable when the drive is gone and restores them on re-attach. The `nofail` fstab option ensures the laptop boots normally even if the drive is absent — Jellyfin starts with an empty `/external` and continues working for local media. When the drive is plugged back in, `mnt-elements.mount` activates and `jellyfin-drive-restart.service` automatically restarts the container so it picks up the new mount.
+
+#### Cloudflare Tunnel
+
+See the [Cloudflare Tunnel](#cloudflare-tunnel) section below for setup instructions.
+
+## Ente Photos
+
+End-to-end encrypted photo backup — a self-hosted Google Photos alternative. Photos are encrypted on-device before upload; the server stores only ciphertext. The backend is [Garage](https://garagehq.deuxfleurs.fr/) (a lightweight S3-compatible object store) instead of MinIO, which was abandoned as open source in 2025.
+
+**Architecture:**
+```
+Mobile/browser → photos.abhijithb.org → ente-web (web UI)
+Mobile/browser → photos-api.abhijithb.org → ente-museum (API)
+Browser upload → storage.abhijithb.org → Caddy → Garage (S3)
+ente-museum → ente-postgres (metadata)
+```
+
+Uploads go directly from the browser to Garage via pre-signed S3 URLs (museum generates the URL, browser puts to it). This requires `storage.abhijithb.org` to be reachable over Tailscale.
+
+### Setup
+
+#### 1. Create config files
+
+```bash
+cp services/ente/garage.toml.example services/ente/garage.toml
+# Edit: set rpc_secret to $(openssl rand -hex 32)
+
+cp services/ente/museum.yaml.example services/ente/museum.yaml
+# Leave placeholders for now — credentials come from the bootstrap script (step 2)
+
+cp services/ente/.env.example services/ente/.env
+# Edit: set POSTGRES_PASSWORD and GARAGE_RPC_SECRET
+```
+
+#### 2. Run the bootstrap script
+
+Handles data directories, Quadlet symlinks, starting the storage layer (Garage + Postgres), and configuring Garage (layout, access key, S3 buckets):
+
+```bash
+bash scripts/ente-bootstrap.sh
+```
+
+Run with `--dry-run` first to see every command without executing anything:
+
+```bash
+bash scripts/ente-bootstrap.sh --dry-run
+```
+
+The script prints a **Key ID** and **Secret key** at the end.
+
+#### 3. Fill in museum.yaml
+
+Paste the Garage credentials from the script output into `services/ente/museum.yaml` under all three S3 bucket sections. Also generate and fill in the crypto secrets:
+
+```bash
+echo "encryption: $(head -c 32 /dev/urandom | base64 | tr -d '\n'; echo)"
+echo "hash:       $(head -c 64 /dev/urandom | base64 | tr -d '\n'; echo)"
+echo "jwt:        $(head -c 32 /dev/urandom | base64 | tr -d '\n' | tr '+/' '-_'; echo)"
+```
+
+> **Note:** The `; echo` inside each subshell ensures the value ends with a newline. Without it, zsh prints a `%` after the value and copy-pasting it into museum.yaml causes `illegal base64 data` on startup.
+
+#### 4. Start museum and web
+
+```bash
+systemctl --user start ente-museum ente-web
+podman exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+#### 5. DNS records (Cloudflare)
+
+Add three A records pointing to your Tailscale IP:
+```
+photos.abhijithb.org     →  <tailscale-ip>
+photos-api.abhijithb.org →  <tailscale-ip>
+storage.abhijithb.org    →  <tailscale-ip>
+```
+
+#### 6. First login
+
+Open `https://photos.abhijithb.org` and sign up with any email address. Since no SMTP is configured, the OTP verification code is printed in the museum logs:
+
+```bash
+podman logs ente-museum 2>&1 | grep -i "otp\|verif\|code"
+```
+
+#### 7. Give yourself unlimited storage
+
+Ente's default free plan is 10 GB. Update it directly in the database:
+
+```bash
+# Replace USER_ID with the number from museum logs: user_id=XXXXXXXXX
+podman exec ente-postgres psql -U pguser -d ente_db -c \
+  "UPDATE subscriptions SET storage = 10995116277760 WHERE user_id = <USER_ID>;"
+```
+
+No restart needed — Ente reads storage from the DB per request.
+
+### Notes
+
+- **Authentication cannot be disabled** — Ente is E2EE; the encryption key is derived from your password. Without logging in, the browser has no key to decrypt photos. Sessions are long-lived so you won't be prompted often.
+- **`internal.admins` takes user IDs, not email addresses** — the ID is the number shown as `user_id=` in museum logs.
+- **Disable registration** — set `internal.disable-registration: true` in museum.yaml so nobody else can sign up on your instance.
 
 ## Cloudflare Tunnel
 

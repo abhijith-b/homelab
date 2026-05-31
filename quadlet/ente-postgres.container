@@ -1,0 +1,23 @@
+[Unit]
+Description=PostgreSQL for Ente
+After=network-online.target
+
+[Container]
+Image=docker.io/postgres:16
+ContainerName=ente-postgres
+Network=homelab.network
+
+EnvironmentFile=%h/git/homelab/services/ente/.env
+
+Volume=ente-postgres-data.volume:/var/lib/postgresql/data
+
+HealthCmd=pg_isready -q -d ente_db -U pguser
+HealthInterval=10s
+HealthStartPeriod=30s
+HealthRetries=5
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

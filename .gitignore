@@ -13,3 +13,6 @@ tailscale-authkey
 
 # Container data volumes
 data/
+
+# Ente: contains S3 credentials, encryption keys, DB password
+services/ente/museum.yaml

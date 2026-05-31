@@ -1,0 +1,20 @@
+[Unit]
+Description=Ente museum API server
+After=network-online.target ente-postgres.service garage.service
+
+[Container]
+# ghcr.io/ente-io/server has no semver tags; pin to a digest after pulling:
+#   podman pull ghcr.io/ente-io/server:latest
+#   podman inspect ghcr.io/ente-io/server:latest --format '{{.Digest}}'
+# Then replace :latest with @sha256:<digest>
+Image=ghcr.io/ente-io/server:latest
+ContainerName=ente-museum
+Network=homelab.network
+
+Volume=%h/git/homelab/services/ente/museum.yaml:/museum.yaml:ro,Z
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

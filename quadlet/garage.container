@@ -1,0 +1,20 @@
+[Unit]
+Description=Garage S3 object storage
+After=network-online.target
+
+[Container]
+Image=docker.io/dxflrs/garage:v2.3.0
+ContainerName=garage
+Network=homelab.network
+
+EnvironmentFile=%h/git/homelab/services/ente/.env
+
+Volume=%h/git/homelab/services/ente/garage.toml:/etc/garage.toml:ro,Z
+Volume=%h/.local/share/containers/homelab/garage/meta:/var/lib/garage/meta:Z
+Volume=%h/.local/share/containers/homelab/garage/data:/var/lib/garage/data:Z
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

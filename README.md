@@ -467,3 +467,6 @@ podman exec caddy caddy reload --config /etc/caddy/Caddyfile
 systemctl --user daemon-reload && systemctl --user restart <service>
 ```
 
+#TODO
+
+i want to add more services in future but too busy

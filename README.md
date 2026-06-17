@@ -2,6 +2,8 @@
 
 Personal homelab running on a Fedora laptop. The idea is simple — the laptop sits at home, gets turned on when needed, and all services come up automatically. I can then reach everything securely from anywhere over Tailscale VPN without opening a single port on the router.
 
+See [diagram.md](diagram.md) for a visual overview of the architecture.
+
 ## How it works
 
 When the laptop boots, systemd starts all configured services via Podman Quadlet units. Tailscale also starts automatically and connects the laptop to my private VPN. From any device on the same Tailscale network (phone, work laptop, etc.) I can access services using clean subdomains of `abhijithb.org`.

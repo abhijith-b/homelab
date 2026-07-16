@@ -457,6 +457,19 @@ Verify it's working by checking your public IP — it should show your home IP.
 
 > **Note:** Exit node only works when the laptop is on. Tailscale fails open — if the exit node is unreachable, client devices fall back to direct internet rather than dropping traffic.
 
+### Sharing your machine with a friend
+
+If you share this laptop with someone outside your tailnet (Tailscale admin console → Machines → Share), their client can end up not routing to it the way the public DNS records expect. `*.abhijithb.org` records point to your machine's actual Tailscale IP, so if your friend can't reach that IP directly, those hostnames won't resolve to anything reachable on their end.
+
+**Fix:** find your machine's real Tailscale IP and have your friend map it in their hosts file:
+```bash
+tailscale ip -4   # run on your machine, e.g. 100.107.154.19
+```
+```
+100.107.154.19   files.abhijithb.org sync.abhijithb.org photos.abhijithb.org media.abhijithb.org
+```
+Keep the real hostnames (don't browse the bare IP) — Caddy's TLS cert is issued for `abhijithb.org` subdomains, so the Host header/SNI must still match for the handshake to succeed.
+
 ## Day-to-day operations
 
 **Reload Caddy after editing the Caddyfile:**

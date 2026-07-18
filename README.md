@@ -459,14 +459,14 @@ Verify it's working by checking your public IP — it should show your home IP.
 
 ### Sharing your machine with a friend
 
-If you share this laptop with someone outside your tailnet (Tailscale admin console → Machines → Share), their client can end up not routing to it the way the public DNS records expect. `*.abhijithb.org` records point to your machine's actual Tailscale IP, so if your friend can't reach that IP directly, those hostnames won't resolve to anything reachable on their end.
+If you share this laptop with someone outside your tailnet (Tailscale admin console → Machines → Share), Tailscale can assign the shared machine a *different* IP scoped to their tailnet — not the same IP it has on your own tailnet. `*.abhijithb.org` records point to your machine's IP as seen from your own tailnet, so your friend's client won't route to that IP, and those hostnames won't resolve to anything reachable on their end.
 
-**Fix:** find your machine's real Tailscale IP and have your friend map it in their hosts file:
+**Fix:** have your friend find the IP *their* client sees for your shared laptop (not their own device's IP, and not the IP you see on your own tailnet) and map it in their hosts file:
 ```bash
-tailscale ip -4   # run on your machine, e.g. 100.107.154.19
+tailscale status   # run on their machine — find your laptop's hostname in the peer list, e.g. 100.107.154.18
 ```
 ```
-100.107.154.19   files.abhijithb.org sync.abhijithb.org photos.abhijithb.org media.abhijithb.org
+100.107.154.18   files.abhijithb.org sync.abhijithb.org photos.abhijithb.org media.abhijithb.org
 ```
 Keep the real hostnames (don't browse the bare IP) — Caddy's TLS cert is issued for `abhijithb.org` subdomains, so the Host header/SNI must still match for the handshake to succeed.
 

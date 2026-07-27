@@ -1,0 +1,25 @@
+[Unit]
+Description=Minecraft server (itzg/minecraft-server)
+After=network-online.target
+
+[Container]
+Image=docker.io/itzg/minecraft-server:2026.7.2
+ContainerName=minecraft
+Network=homelab.network
+PublishPort=25565:25565
+
+EnvironmentFile=%h/git/homelab/services/minecraft/.env
+
+UserNS=keep-id
+SecurityLabelDisable=true
+PodmanArgs=--memory=3g
+
+Volume=%h/.local/share/containers/homelab/minecraft/data:/data:Z
+
+[Service]
+Restart=unless-stopped
+TimeoutStopSec=60
+MemoryMax=3G
+
+[Install]
+WantedBy=default.target

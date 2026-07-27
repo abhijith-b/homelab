@@ -35,6 +35,7 @@ Compose is the more common choice and has better documentation online, but it is
 | Jellyfin | `https://media.abhijithb.org` | Media streaming — movies, TV shows, anime |
 | Ente Photos | `https://photos.abhijithb.org` | E2EE photo backup and gallery (Google Photos replacement) |
 | Cloudflare Tunnel | public hostnames | Exposes public services without opening ports. `cloudflared` dials out to Cloudflare — no port forwarding needed. |
+| Minecraft | Tailscale IP `:25565` | Vanilla Minecraft server (`itzg/minecraft-server`). Raw TCP, so it can't go through Caddy — connect directly with the Tailscale IP and port. |
 
 ## Setting up from scratch
 
@@ -258,6 +259,34 @@ sudo systemctl enable jellyfin-drive-restart.service
 Add the path as a library in the UI (Dashboard → Libraries → Add Media Library → `/external`). Turn off **"Delete media from library when files are removed from disk"** in library settings to keep metadata when the drive is unplugged.
 
 **Unplugging / re-attaching the drive:** Jellyfin marks those items unavailable when the drive is gone and restores them on re-attach. The `nofail` fstab option ensures the laptop boots normally even if the drive is absent — Jellyfin starts with an empty `/external` and continues working for local media. When the drive is plugged back in, `mnt-elements.mount` activates and `jellyfin-drive-restart.service` automatically restarts the container so it picks up the new mount.
+
+#### Minecraft
+
+```bash
+mkdir -p ~/.local/share/containers/homelab/minecraft/data
+cp services/minecraft/.env.example services/minecraft/.env
+# Edit .env and set RCON_PASSWORD: openssl rand -hex 16
+
+ln -sf ~/git/homelab/quadlet/minecraft.container ~/.config/containers/systemd/minecraft.container
+systemctl --user daemon-reload
+systemctl --user start minecraft
+```
+
+Connect with the official Minecraft launcher (or any client on a legitimate Microsoft account — the server runs `ONLINE_MODE=true`) using `<tailscale-ip>:25565`.
+
+No DNS record or Caddyfile block needed — Minecraft speaks raw TCP, not HTTP, so it's reached directly like Cockpit rather than proxied through Caddy.
+
+**Admin console (RCON):**
+```bash
+podman exec minecraft rcon-cli save-all
+podman exec minecraft rcon-cli whitelist add <player>
+```
+
+> **Note:** `MemoryMax=3G` under `[Service]` in the Quadlet file genuinely enforces the cap at the kernel cgroup level, but `podman inspect`/`podman stats` won't show it since that value only comes from Podman's own `--memory` flag — the two are independent views of the same cgroup. `PodmanArgs=--memory=3g` is also set in `[Container]` purely so Podman's own tooling reflects the limit too.
+
+> **Note:** Mojang switched to year-based versioning in 2026 (e.g. `26.2`), so `VERSION=` in `.env` is set to `LATEST` rather than a hardcoded version string. The `itzg/minecraft-server` image tag (e.g. `2026.7.2`) is a separate, independent version axis from the game version — pin the image tag, let `VERSION=LATEST` track the game.
+
+**Not yet done:** backups of `/data`, `ENABLE_AUTOPAUSE` (pausing when no players are online — needs `CAP_NET_RAW` and disabling the tick watchdog, deferred until the base setup has run stable for a while), and a whitelist (currently open to anyone with the Tailscale IP).
 
 #### Cloudflare Tunnel
 
